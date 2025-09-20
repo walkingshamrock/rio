@@ -26,6 +26,8 @@ pub struct Bell {
     pub visual_bell_color: [f32; 3],
     #[serde(default = "VisualBellMode::default")]
     pub visual_bell_mode: VisualBellMode,
+    #[serde(default = "default_visual_bell_duration")]
+    pub visual_bell_duration: u64,
 }
 
 impl Default for Bell {
@@ -36,6 +38,7 @@ impl Default for Bell {
             visual_bell_opacity: default_visual_bell_opacity(),
             visual_bell_color: default_visual_bell_color(),
             visual_bell_mode: VisualBellMode::default(),
+            visual_bell_duration: default_visual_bell_duration(),
         }
     }
 }
@@ -62,4 +65,8 @@ fn default_visual_bell_opacity() -> f32 {
 
 fn default_visual_bell_color() -> [f32; 3] {
     [1.0, 1.0, 1.0] // White by default
+}
+
+fn default_visual_bell_duration() -> u64 {
+    125 // 125 milliseconds by default
 }

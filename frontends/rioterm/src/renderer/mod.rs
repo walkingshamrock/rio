@@ -66,6 +66,7 @@ pub struct Renderer {
     visual_bell_opacity: f32,
     visual_bell_color: [f32; 3],
     visual_bell_mode: rio_backend::config::bell::VisualBellMode,
+    visual_bell_duration: std::time::Duration,
     font_context: rio_backend::sugarloaf::font::FontLibrary,
     font_cache: FontCache,
     char_cache: CharCache,
@@ -123,6 +124,7 @@ impl Renderer {
             visual_bell_opacity: config.bell.visual_bell_opacity,
             visual_bell_color: config.bell.visual_bell_color,
             visual_bell_mode: config.bell.visual_bell_mode.clone(),
+            visual_bell_duration: std::time::Duration::from_millis(config.bell.visual_bell_duration),
             search: Search::default(),
             font_cache: FontCache::new(),
             font_context: font_context.clone(),
@@ -736,13 +738,13 @@ impl Renderer {
 
         if let Some(start_time) = self.visual_bell_start {
             let elapsed = start_time.elapsed();
-            if elapsed >= crate::constants::BELL_DURATION {
+            if elapsed >= self.visual_bell_duration {
                 self.visual_bell_active = false;
                 self.visual_bell_start = None;
                 0.0
             } else {
-                // Calculate fade-out: start at configured opacity, fade to 0.0
-                let progress = elapsed.as_secs_f32() / crate::constants::BELL_DURATION.as_secs_f32();
+                // Simple linear fade-out for smoothness
+                let progress = elapsed.as_secs_f32() / self.visual_bell_duration.as_secs_f32();
                 let opacity = self.visual_bell_opacity * (1.0 - progress);
                 opacity
             }

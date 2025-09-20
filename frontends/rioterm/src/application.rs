@@ -111,17 +111,39 @@ impl Application<'_> {
             // Force immediate render to show the bell
             route.request_redraw();
 
-            // Schedule a render after the bell duration to clear it
-            let timer_id =
-                TimerId::new(Topic::Render, route.window.screen.ctx().current_route());
-            let event = EventPayload::new(RioEventType::Rio(RioEvent::Render), window_id);
+            // Schedule continuous renders for smooth animation
+            let visual_bell_duration = self.config.bell.visual_bell_duration;
+            let frame_interval = 20; // 50 FPS
+            let base_route = route.window.screen.ctx().current_route();
+            
+            // Schedule renders every 20ms for smooth animation
+            let mut frame_count = 0;
+            let mut current_time = frame_interval;
+            
+            while current_time < visual_bell_duration {
+                frame_count += 1;
+                // Use a unique timer ID by combining base route with frame count
+                let timer_id = TimerId::new(Topic::CursorBlinking, base_route + frame_count * 1000);
+                let event = EventPayload::new(RioEventType::Rio(RioEvent::Render), window_id);
 
-            // Schedule render to clear bell effect after visual bell duration
+                self.scheduler.schedule(
+                    event,
+                    std::time::Duration::from_millis(current_time),
+                    false,
+                    timer_id,
+                );
+                
+                current_time += frame_interval;
+            }
+            
+            // Final cleanup render
+            let final_timer_id = TimerId::new(Topic::CursorBlinking, base_route + 99999);
+            let final_event = EventPayload::new(RioEventType::Rio(RioEvent::Render), window_id);
             self.scheduler.schedule(
-                event,
-                crate::constants::BELL_DURATION,
+                final_event,
+                std::time::Duration::from_millis(visual_bell_duration + 50),
                 false,
-                timer_id,
+                final_timer_id,
             );
         }
     }
