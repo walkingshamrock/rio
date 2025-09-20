@@ -112,7 +112,17 @@ impl Application<'_> {
             route.request_redraw();
 
             // Schedule continuous renders for smooth animation
-            let visual_bell_duration = self.config.bell.visual_bell_duration;
+            // Apply backward compatibility for duration calculation
+            let (fade_in_duration, fade_out_duration) = if self.config.bell.visual_bell_fade_in_duration == 50 && 
+                self.config.bell.visual_bell_fade_out_duration == 150 && 
+                self.config.bell.visual_bell_duration != 125 {
+                // Use legacy duration split: 25% fade-in, 75% fade-out
+                (self.config.bell.visual_bell_duration / 4, (self.config.bell.visual_bell_duration * 3) / 4)
+            } else {
+                // Use new duration settings
+                (self.config.bell.visual_bell_fade_in_duration, self.config.bell.visual_bell_fade_out_duration)
+            };
+            let total_visual_bell_duration = fade_in_duration + fade_out_duration;
             let frame_interval = 20; // 50 FPS
             let base_route = route.window.screen.ctx().current_route();
             
@@ -120,7 +130,7 @@ impl Application<'_> {
             let mut frame_count = 0;
             let mut current_time = frame_interval;
             
-            while current_time < visual_bell_duration {
+            while current_time < total_visual_bell_duration {
                 frame_count += 1;
                 // Use a unique timer ID by combining base route with frame count
                 let timer_id = TimerId::new(Topic::CursorBlinking, base_route + frame_count * 1000);
@@ -141,7 +151,7 @@ impl Application<'_> {
             let final_event = EventPayload::new(RioEventType::Rio(RioEvent::Render), window_id);
             self.scheduler.schedule(
                 final_event,
-                std::time::Duration::from_millis(visual_bell_duration + 50),
+                std::time::Duration::from_millis(total_visual_bell_duration + 50),
                 false,
                 final_timer_id,
             );

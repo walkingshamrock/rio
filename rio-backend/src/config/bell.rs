@@ -28,6 +28,10 @@ pub struct Bell {
     pub visual_bell_mode: VisualBellMode,
     #[serde(default = "default_visual_bell_duration")]
     pub visual_bell_duration: u64,
+    #[serde(default = "default_visual_bell_fade_in_duration")]
+    pub visual_bell_fade_in_duration: u64,
+    #[serde(default = "default_visual_bell_fade_out_duration")]
+    pub visual_bell_fade_out_duration: u64,
 }
 
 impl Default for Bell {
@@ -39,6 +43,8 @@ impl Default for Bell {
             visual_bell_color: default_visual_bell_color(),
             visual_bell_mode: VisualBellMode::default(),
             visual_bell_duration: default_visual_bell_duration(),
+            visual_bell_fade_in_duration: default_visual_bell_fade_in_duration(),
+            visual_bell_fade_out_duration: default_visual_bell_fade_out_duration(),
         }
     }
 }
@@ -69,4 +75,12 @@ fn default_visual_bell_color() -> [f32; 3] {
 
 fn default_visual_bell_duration() -> u64 {
     125 // 125 milliseconds by default
+}
+
+fn default_visual_bell_fade_in_duration() -> u64 {
+    50 // 50 milliseconds for quick fade-in
+}
+
+fn default_visual_bell_fade_out_duration() -> u64 {
+    150 // 150 milliseconds for slower fade-out
 }

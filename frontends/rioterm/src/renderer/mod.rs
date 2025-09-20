@@ -67,6 +67,8 @@ pub struct Renderer {
     visual_bell_color: [f32; 3],
     visual_bell_mode: rio_backend::config::bell::VisualBellMode,
     visual_bell_duration: std::time::Duration,
+    visual_bell_fade_in_duration: std::time::Duration,
+    visual_bell_fade_out_duration: std::time::Duration,
     font_context: rio_backend::sugarloaf::font::FontLibrary,
     font_cache: FontCache,
     char_cache: CharCache,
@@ -125,6 +127,22 @@ impl Renderer {
             visual_bell_color: config.bell.visual_bell_color,
             visual_bell_mode: config.bell.visual_bell_mode.clone(),
             visual_bell_duration: std::time::Duration::from_millis(config.bell.visual_bell_duration),
+            // Backward compatibility: if fade durations are default values but legacy duration isn't,
+            // split the legacy duration (25% fade-in, 75% fade-out)
+            visual_bell_fade_in_duration: {
+                if config.bell.visual_bell_fade_in_duration == 50 && config.bell.visual_bell_fade_out_duration == 150 && config.bell.visual_bell_duration != 125 {
+                    std::time::Duration::from_millis(config.bell.visual_bell_duration / 4)
+                } else {
+                    std::time::Duration::from_millis(config.bell.visual_bell_fade_in_duration)
+                }
+            },
+            visual_bell_fade_out_duration: {
+                if config.bell.visual_bell_fade_in_duration == 50 && config.bell.visual_bell_fade_out_duration == 150 && config.bell.visual_bell_duration != 125 {
+                    std::time::Duration::from_millis((config.bell.visual_bell_duration * 3) / 4)
+                } else {
+                    std::time::Duration::from_millis(config.bell.visual_bell_fade_out_duration)
+                }
+            },
             search: Search::default(),
             font_cache: FontCache::new(),
             font_context: font_context.clone(),
@@ -738,14 +756,22 @@ impl Renderer {
 
         if let Some(start_time) = self.visual_bell_start {
             let elapsed = start_time.elapsed();
-            if elapsed >= self.visual_bell_duration {
+            let total_duration = self.visual_bell_fade_in_duration + self.visual_bell_fade_out_duration;
+            
+            if elapsed >= total_duration {
                 self.visual_bell_active = false;
                 self.visual_bell_start = None;
                 0.0
+            } else if elapsed < self.visual_bell_fade_in_duration {
+                // Phase 1: Fade-in (0% -> 100% opacity)
+                let fade_in_progress = elapsed.as_secs_f32() / self.visual_bell_fade_in_duration.as_secs_f32();
+                let opacity = self.visual_bell_opacity * fade_in_progress;
+                opacity
             } else {
-                // Simple linear fade-out for smoothness
-                let progress = elapsed.as_secs_f32() / self.visual_bell_duration.as_secs_f32();
-                let opacity = self.visual_bell_opacity * (1.0 - progress);
+                // Phase 2: Fade-out (100% -> 0% opacity)
+                let fade_out_elapsed = elapsed - self.visual_bell_fade_in_duration;
+                let fade_out_progress = fade_out_elapsed.as_secs_f32() / self.visual_bell_fade_out_duration.as_secs_f32();
+                let opacity = self.visual_bell_opacity * (1.0 - fade_out_progress);
                 opacity
             }
         } else {
