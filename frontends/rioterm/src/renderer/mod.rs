@@ -63,6 +63,9 @@ pub struct Renderer {
     // Visual bell state
     visual_bell_active: bool,
     visual_bell_start: Option<std::time::Instant>,
+    visual_bell_opacity: f32,
+    visual_bell_color: [f32; 3],
+    visual_bell_mode: rio_backend::config::bell::VisualBellMode,
     font_context: rio_backend::sugarloaf::font::FontLibrary,
     font_cache: FontCache,
     char_cache: CharCache,
@@ -117,6 +120,9 @@ impl Renderer {
             dynamic_background,
             visual_bell_active: false,
             visual_bell_start: None,
+            visual_bell_opacity: config.bell.visual_bell_opacity,
+            visual_bell_color: config.bell.visual_bell_color,
+            visual_bell_mode: config.bell.visual_bell_mode.clone(),
             search: Search::default(),
             font_cache: FontCache::new(),
             font_context: font_context.clone(),
@@ -721,22 +727,27 @@ impl Renderer {
     }
 
     /// Check if visual bell should be displayed and update its state
+    /// Returns the current opacity for the bell overlay (0.0 if inactive)
     #[inline]
-    pub fn update_visual_bell(&mut self) -> bool {
+    pub fn update_visual_bell(&mut self) -> f32 {
         if !self.visual_bell_active {
-            return false;
+            return 0.0;
         }
 
         if let Some(start_time) = self.visual_bell_start {
-            if start_time.elapsed() >= crate::constants::BELL_DURATION {
+            let elapsed = start_time.elapsed();
+            if elapsed >= crate::constants::BELL_DURATION {
                 self.visual_bell_active = false;
                 self.visual_bell_start = None;
-                false
+                0.0
             } else {
-                true
+                // Calculate fade-out: start at configured opacity, fade to 0.0
+                let progress = elapsed.as_secs_f32() / crate::constants::BELL_DURATION.as_secs_f32();
+                let opacity = self.visual_bell_opacity * (1.0 - progress);
+                opacity
             }
         } else {
-            false
+            0.0
         }
     }
 
@@ -1114,17 +1125,60 @@ impl Renderer {
         context_manager.extend_with_grid_objects(&mut objects);
         // let _duration = start.elapsed();
 
-        // Update visual bell state and set overlay if needed
-        let visual_bell_active = self.update_visual_bell();
+        // Update visual bell state and get current opacity
+        let visual_bell_opacity = self.update_visual_bell();
 
-        // Set visual bell overlay that renders on top of everything
-        let bell_overlay = if visual_bell_active {
-            Some(Quad {
-                position: [0.0, 0.0],
-                size: [window_size.width, window_size.height],
-                color: self.named_colors.foreground,
-                ..Quad::default()
-            })
+        // Set visual bell overlay based on the configured mode
+        let bell_overlay = if visual_bell_opacity > 0.0 {
+            use rio_backend::config::bell::VisualBellMode;
+            match self.visual_bell_mode {
+                VisualBellMode::Overlay => {
+                    Some(Quad {
+                        position: [0.0, 0.0],
+                        size: [window_size.width, window_size.height],
+                        color: [
+                            self.visual_bell_color[0],
+                            self.visual_bell_color[1],
+                            self.visual_bell_color[2],
+                            visual_bell_opacity
+                        ],
+                        ..Quad::default()
+                    })
+                }
+                VisualBellMode::Border => {
+                    // Border mode: draw a border around the terminal
+                    Some(Quad {
+                        position: [0.0, 0.0],
+                        size: [window_size.width, window_size.height],
+                        color: [0.0, 0.0, 0.0, 0.0], // Transparent background
+                        border_color: [
+                            self.visual_bell_color[0],
+                            self.visual_bell_color[1],
+                            self.visual_bell_color[2],
+                            visual_bell_opacity
+                        ],
+                        border_width: 4.0,
+                        ..Quad::default()
+                    })
+                }
+                VisualBellMode::Inverse => {
+                    // For inverse mode, we'll invert the entire screen
+                    // This requires a special blend mode or shader effect
+                    // For now, we'll use a simple overlay with inverted background color
+                    let inverted_bg = self.dynamic_background.0;
+                    Some(Quad {
+                        position: [0.0, 0.0],
+                        size: [window_size.width, window_size.height],
+                        color: [
+                            1.0 - inverted_bg[0],
+                            1.0 - inverted_bg[1],
+                            1.0 - inverted_bg[2],
+                            visual_bell_opacity * 0.5 // Use lower opacity for inverse
+                        ],
+                        ..Quad::default()
+                    })
+                }
+            }
         } else {
             None
         };

@@ -1,11 +1,31 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum VisualBellMode {
+    Overlay,
+    Inverse,
+    Border,
+}
+
+impl Default for VisualBellMode {
+    fn default() -> Self {
+        VisualBellMode::Overlay
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Bell {
     #[serde(default = "default_visual_bell")]
     pub visual: bool,
     #[serde(default = "default_audio_bell")]
     pub audio: bool,
+    #[serde(default = "default_visual_bell_opacity")]
+    pub visual_bell_opacity: f32,
+    #[serde(default = "default_visual_bell_color")]
+    pub visual_bell_color: [f32; 3],
+    #[serde(default = "VisualBellMode::default")]
+    pub visual_bell_mode: VisualBellMode,
 }
 
 impl Default for Bell {
@@ -13,6 +33,9 @@ impl Default for Bell {
         Bell {
             visual: default_visual_bell(),
             audio: default_audio_bell(),
+            visual_bell_opacity: default_visual_bell_opacity(),
+            visual_bell_color: default_visual_bell_color(),
+            visual_bell_mode: VisualBellMode::default(),
         }
     }
 }
@@ -31,4 +54,12 @@ fn default_audio_bell() -> bool {
     {
         false
     }
+}
+
+fn default_visual_bell_opacity() -> f32 {
+    0.15
+}
+
+fn default_visual_bell_color() -> [f32; 3] {
+    [1.0, 1.0, 1.0] // White by default
 }
